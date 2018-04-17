@@ -1,0 +1,1 @@
+Implementation of fractal interpolation procedure
