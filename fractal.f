@@ -1,112 +1,72 @@
 
       program matr_test
 
-      real*8 dd1,dd2,w,xi
+      use affine_transform
+
+      real*8 dd1,dd2,xi
       integer nn
       parameter(dd1=2d0**(-1.0d0/3.0d0),dd2=-2d0**(-1.0d0/3.0d0))
-      real*8 tabU(0:2),u_interpolated
+      real*8 tabU(0:2),tab_y(0:2, 0:2), tab_z(0:2)
+      real*8 upp(0:1,0:2,0:2)
+      real*8 u_interpolated
       integer aa, i,j,k, ii, grid_x,grid_y,grid_z,par
+      integer n_tab(3)
+      parameter(n_tab=(/1,1,1/))
 
-      real*8, DIMENSION(5) ::upar_odd, x_odd
-      real*8, DIMENSION(6) ::upar_even,x_even
+      real*8 xpar,ypar,zpar
 
+
+      call RANDOM_NUMBER(upp)
+
+      xpar = 0.5
+      ypar = 0.5
+      zpar = 0.5
+
+      write(*,*) upp
+c-----------------------------------------------------------------------
+c First stage (9 iterations in the x direction):
+c due to nonuniform grid points in wall-normal direction
+c we will use linear interpolation there
+c TODO - think how to incorporate nonuniform grids in fractal model
+      tab_y = 0.0d0
+      do i=0, 2
+      do j=0, 2
       
-      x_odd = (/ 0.0 ,  0.25 ,  0.5 ,  0.75 ,  1.0 /)
-      x_even = (/ 0.0 ,  0.25 ,  0.5 ,  0.75 ,  1.0, 1.25 /)
-      upar_odd = (/ 0.020883 ,  0.021884 ,  0.036644 ,  
-     &              0.025015 ,  0.031795 /)
-      upar_even = (/ 0.020883 ,  0.021884 ,  0.036644 ,  
-     &          0.025015 ,  0.031795, -0.013087 /)
+              tabU(0) = upp(0,i,j)
+              tabU(1) = upp(1,i,j)
 
-              
-      nn = 1 !number of mapping iteration for ii component
+              xi = xpar 
+              tab_y(i,j) =(1-xi)*tabU(0) + xi*tabU(1)
+              write(*,*) i,j,"xpar",tabU,tab_y(i,j)
+      enddo
+      enddo
+c-----------------------------------------------------------------------
+c-----------------------------------------------------------------------
+c Second stage (3 iterations in the y direction):
+      tab_z = 0.0d0
+      do i=0, 2
+            tabU(0) = tab_y(i,0)
+            tabU(1)= tab_y(i,1)
+            tabU(2)= tab_y(i,2)
 
-      do i=1, 5/2
+            xi = ypar 
+            tab_z(i) = w(n_tab(2),dd1,dd2,xi,tabU)
+c            tab_z(i) =(1-xi)*tabU(0) + xi*tabU(2)
+            write(*,*) i,"ypar",tabU,tab_z(i)
+      enddo
+      
+c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
 c Third stage (one iteration in the z direction)
-	      tabU(0) =upar_odd(2*i-1)
-	      tabU(1)=upar_odd(2*i)
-	      tabU(2)=upar_odd(2*i+1)
+      tabU(0) = tab_z(0)
+      tabU(1)= tab_z(1)
+      tabU(2)= tab_z(2)
 
-              write(*,*) tabU
-              do j=0,10
-                      xi = 0.1*j 
+      xi = zpar 
 
-                      u_interpolated  =  w(nn,dd1,dd2,xi,tabU)
-                      write(*,*)xi, u_interpolated
-              enddo
-      end do !end par
-
-
-c/\/\/\/\/\\/\/\\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/
-c/\/\/\/\/\\/\/\\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/
-c/\/\/\/\/\\/\/\\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/
-c/\/\/\/\/\\/\/\\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/
-c Soubroutine w is the mapping procedure
-
+      par_velocity = w(n_tab(3),dd1,dd2,xi,tabU)
+      write(*,*) "zpar",tabU,par_velocity
+      
 
       end program
-
-
-      FUNCTION w(nn,dd1,dd2,xi,tabU) RESULT(usgs)
-          integer nn
-          real*8 dd1,dd2,xi,u0,w_rec
-          real*8 usgs, tabU(0:2)
-
-          usgs = w_rec(nn,dd1,dd2,xi,tabU)
-
-          RETURN
-
-      END FUNCTION w
-
-
-      RECURSIVE FUNCTION w_rec(nn,dd1,dd2,xi,tabU) RESULT(usgs)
-          implicit none
-          integer nn
-          real*8 dd1,dd2,xi
-          real*8 q1,q2
-          real*8 usgs, tabU(0:2)
-
-          if (nn.eq.0) then
-             usgs =  (tabU(2)-tabU(0))*xi + tabU(0)
-
-          else
-             if (xi.le.0.5) then
-                usgs = dd1 * w_rec(nn-1,dd1,dd2,2*xi,tabU)
-     &                 + q1(2*xi,dd1,tabU)
-             else
-                usgs = dd2 * w_rec(nn-1,dd1,dd2,2*xi-1,tabU)
-     &                 + q2(2*xi-1,dd2,tabU)
-
-             endif
-          endif
-      END FUNCTION w_rec
-
-
-
-c$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
-      pure function q1(xi,dd1,tabU)
-          implicit none
-          real*8, intent(in) :: xi,dd1
-          real*8 , intent(in) ::tabU(0:2)
-          real*8 q1
-
-          q1=xi*(tabU(1)-tabU(0)-dd1*(tabU(2)-tabU(0)))
-     &          + tabU(0)*(1-dd1)
-
-      end function
-c$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
-      pure function q2(xi,dd2,tabU)
-          implicit none
-          real*8, intent(in) :: xi,dd2
-          real*8 , intent(in) ::tabU(0:2)
-          real*8 q2
-
-          q2=xi*(tabU(2)-tabU(1)-dd2*(tabU(2)-tabU(0)))
-     &          + tabU(1)-dd2*tabU(0)
-
-      end function
-c$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
-
-
 
